@@ -58,10 +58,11 @@ export interface RankedRoute extends BridgeRoute {
 export class RouteRanker {
   private static instance: RouteRanker;
   private defaultCriteria: RankingCriteria = {
-    feeWeight: 0.3,
-    speedWeight: 0.3,
-    reliabilityWeight: 0.3,
-    confidenceWeight: 0.1,
+    feeWeight: 0.25,
+    speedWeight: 0.25,
+    reliabilityWeight: 0.25,
+    confidenceWeight: 0.15,
+    networkWeight: 0.1,
     maxSlippage: 5.0, // 5%
     maxTime: 60, // 1 hour
     minSuccessRate: 0.8, // 80%
@@ -197,11 +198,15 @@ export class RouteRanker {
     const maxConfidence = Math.max(...confidenceScores);
     const confidenceScore = this.normalizeScore(route.confidence || 0.5, minConfidence, maxConfidence, false);
 
+    // Network score (dynamic Stellar and network conditions)
+    const networkScore = calculateStellarNetworkScore(route, allRoutes);
+
     return {
       feeScore,
       speedScore,
       reliabilityScore,
       confidenceScore,
+      networkScore,
     };
   }
 
@@ -212,14 +217,16 @@ export class RouteRanker {
     breakdown: ReturnType<RouteRanker['calculateScoreBreakdown']>,
     criteria: RankingCriteria
   ): number {
-    const totalWeight = criteria.feeWeight + criteria.speedWeight + 
-                     criteria.reliabilityWeight + criteria.confidenceWeight;
+    const totalWeight = criteria.feeWeight + criteria.speedWeight +
+                     criteria.reliabilityWeight + criteria.confidenceWeight +
+                     criteria.networkWeight;
     
     return (
       (breakdown.feeScore * criteria.feeWeight +
        breakdown.speedScore * criteria.speedWeight +
        breakdown.reliabilityScore * criteria.reliabilityWeight +
-       breakdown.confidenceScore * criteria.confidenceWeight) / totalWeight
+       breakdown.confidenceScore * criteria.confidenceWeight +
+       breakdown.networkScore * criteria.networkWeight) / totalWeight
     );
   }
 
