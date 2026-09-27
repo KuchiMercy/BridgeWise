@@ -26,6 +26,11 @@ jobs:
         run: pnpm run lint
         working-directory: apps/api
 
+      - name: Test controlled canary rollout
+        run: pnpm --filter @bridgewise/relayer-service exec jest --runInBand --moduleFileExtensions ts json js -- executors/canary-rollout.spec.ts
+      - name: Test key vault and rotation lifecycle
+        run: pnpm --filter api exec jest --runInBand --moduleFileExtensions ts json js -- security/api-key-vault.service.spec.ts security/api-key-rotation.service.spec.ts
+
       - name: Build
         run: pnpm run build
         working-directory: apps/api
@@ -37,6 +42,9 @@ jobs:
       - name: Test e2e
         run: pnpm run test:e2e
         working-directory: apps/api
+
+      - name: Build relayer service
+        run: pnpm --filter @bridgewise/relayer-service build
 
       - uses: dtolnay/rust-toolchain@stable
 

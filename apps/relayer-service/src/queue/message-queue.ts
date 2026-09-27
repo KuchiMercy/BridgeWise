@@ -5,7 +5,10 @@ import {
   MessageQueueItem,
   QueueConfig,
   ExecutionResult,
+  DuplicateCheckResult,
+  DuplicateDetectorStats,
 } from '../types';
+import { DuplicateMessageDetector, computeMessageFingerprint } from '../dedup/duplicate-message-detector';
 
 const DEFAULT_CONFIG: QueueConfig = {
   maxRetries: 5,
@@ -17,21 +20,35 @@ const DEFAULT_CONFIG: QueueConfig = {
 export class MessageQueue extends EventEmitter {
   private config: QueueConfig;
   private queue: Map<string, MessageQueueItem> = new Map();
-  private processing: Set<string> = new Set();
+  private processing: Map<string, MessageQueueItem> = new Map();
   private failed: Map<string, MessageQueueItem> = new Map();
   private completed: Map<string, ExecutionResult> = new Map();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private detector: DuplicateMessageDetector | null;
 
   constructor(config?: Partial<QueueConfig>) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.detector =
+      this.config.deduplication === false ? null : new DuplicateMessageDetector(this.config.deduplication);
   }
 
-  enqueue(message: CrossChainMessage): void {
-    const existing = this.queue.get(message.id);
-    if (existing) {
-      this.emit('duplicate-message', { messageId: message.id });
-      return;
+  /** Returns false when the message was rejected as a duplicate. */
+  enqueue(message: CrossChainMessage): boolean {
+    const check = this.checkDuplicate(message);
+    if (check.duplicate) {
+      const event = {
+        messageId: message.id,
+        reason: check.reason,
+        originalMessageId: check.originalMessageId,
+        fingerprint: check.fingerprint,
+        occurrences: check.occurrences,
+      };
+      this.emit('duplicate-message', event);
+      if (check.reason === 'message-id-conflict') {
+        this.emit('message-id-conflict', event);
+      }
+      return false;
     }
 
     const item: MessageQueueItem = {
@@ -42,6 +59,7 @@ export class MessageQueue extends EventEmitter {
     };
     this.queue.set(message.id, item);
     this.emit('message-enqueued', { messageId: message.id, destinationChainId: message.destinationChainId });
+    return true;
   }
 
   dequeue(): CrossChainMessage | null {
@@ -61,7 +79,7 @@ export class MessageQueue extends EventEmitter {
     if (!oldest) return null;
 
     this.queue.delete(oldest.message.id);
-    this.processing.add(oldest.message.id);
+    this.processing.set(oldest.message.id, oldest);
     oldest.message.status = 'processing';
 
     this.emit('message-dequeued', { messageId: oldest.message.id });
@@ -69,16 +87,16 @@ export class MessageQueue extends EventEmitter {
   }
 
   async complete(result: ExecutionResult): Promise<void> {
+    const item = this.processing.get(result.messageId) ?? null;
     this.processing.delete(result.messageId);
     this.completed.set(result.messageId, result);
 
     if (result.success) {
       this.emit('message-completed', result);
     } else {
-      const item = this.getMessage(result.messageId, result);
       if (item) {
         item.attempts++;
-        if (item.attempts < this.config.maxRetries) {
+        if (item.attempts <= this.config.maxRetries) {
           item.nextRetryAt = Date.now() + this.config.retryDelayMs * Math.pow(2, item.attempts - 1);
           item.message.status = 'queued';
           item.message.lastError = result.error;
@@ -156,19 +174,42 @@ export class MessageQueue extends EventEmitter {
     return count;
   }
 
+  getDuplicateStats(): DuplicateDetectorStats | null {
+    return this.detector ? this.detector.getStats() : null;
+  }
+
   clear(): void {
     this.queue.clear();
     this.processing.clear();
     this.failed.clear();
     this.completed.clear();
+    this.detector?.clear();
     this.emit('queue-cleared');
   }
 
-  private getMessage(messageId: string, result?: ExecutionResult): MessageQueueItem | null {
-    const fromQueue = this.queue.get(messageId);
-    if (fromQueue) return fromQueue;
-    const fromFailed = this.failed.get(messageId);
-    if (fromFailed) return fromFailed;
-    return null;
+  /**
+   * The detector catches content re-deliveries within its window; the
+   * lifecycle maps catch ID re-deliveries for as long as the queue holds the
+   * message, including after it has left the detector window.
+   */
+  private checkDuplicate(message: CrossChainMessage): DuplicateCheckResult {
+    const detected = this.detector?.register(message);
+    if (detected?.duplicate) return detected;
+
+    const known = this.queue.get(message.id) ?? this.processing.get(message.id) ?? this.failed.get(message.id);
+    if (known || this.completed.has(message.id)) {
+      // Aged out of the detector window: don't let the rejected copy be recorded as new.
+      this.detector?.release(message.id);
+      const fingerprint = detected?.fingerprint ?? computeMessageFingerprint(message);
+      const conflict = known !== undefined && computeMessageFingerprint(known.message) !== fingerprint;
+      return {
+        duplicate: true,
+        reason: conflict ? 'message-id-conflict' : 'message-id',
+        fingerprint,
+        originalMessageId: message.id,
+      };
+    }
+
+    return detected ?? { duplicate: false, fingerprint: computeMessageFingerprint(message) };
   }
 }
