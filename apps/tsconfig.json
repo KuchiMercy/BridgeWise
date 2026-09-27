@@ -10,7 +10,9 @@
     "sourceMap": true,
     "baseUrl": ".",
     "declaration": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": ".",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "api/src/**/*.ts",

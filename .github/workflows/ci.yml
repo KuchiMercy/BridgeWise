@@ -22,8 +22,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm run lint
+        working-directory: apps/api
+
       - name: Build
         run: pnpm run build
+        working-directory: apps/api
+
+      - name: Test
+        run: pnpm run test
+        working-directory: apps/api
+
+      - name: Test e2e
+        run: pnpm run test:e2e
+        working-directory: apps/api
 
       - uses: dtolnay/rust-toolchain@stable
 
