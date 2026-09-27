@@ -65,6 +65,10 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
   - UI status updates
   - Configuration options
 
+- **[PRE_SIGNING_READINESS.md](./PRE_SIGNING_READINESS.md)** - PRE-SIGNING SAFETY
+  - Required balance and allowance checks
+  - Route, policy limit, provider health, and quote freshness gates
+  - Fail-closed signer wrapper and safe failure handling
 - **[ROUTE_REJECTION_REASONS.md](./ROUTE_REJECTION_REASONS.md)** - ROUTE DECISIONS
   - Stable codes for rejected route candidates
   - All applicable rejection reasons and backward-compatible summaries
