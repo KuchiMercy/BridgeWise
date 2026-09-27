@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm run lint
+        working-directory: apps/api
 
       - name: Test controlled canary rollout
         run: pnpm --filter @bridgewise/relayer-service exec jest --runInBand --moduleFileExtensions ts json js -- executors/canary-rollout.spec.ts
@@ -30,6 +33,15 @@ jobs:
 
       - name: Build
         run: pnpm run build
+        working-directory: apps/api
+
+      - name: Test
+        run: pnpm run test
+        working-directory: apps/api
+
+      - name: Test e2e
+        run: pnpm run test:e2e
+        working-directory: apps/api
 
       - name: Build relayer service
         run: pnpm --filter @bridgewise/relayer-service build
