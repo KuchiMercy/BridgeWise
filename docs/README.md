@@ -4,6 +4,13 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
 
 ## 📚 Documentation Files
 
+### Smart Contract Operations
+
+- **[CONTRACT_UPGRADES_AND_ACCOUNTING.md](./CONTRACT_UPGRADES_AND_ACCOUNTING.md)**
+  - Upgrade authorization and immutable-code policy
+  - Fee and vault accounting invariants
+  - Production monitoring and verification
+
 ### Getting Started
 
 - **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** ⭐ START HERE
