@@ -226,14 +226,15 @@ describe('TransactionsStatusService', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('should skip failed individual status lookups in batch', async () => {
+    it('should skip IDs missing from the batch query result', async () => {
       const transactions = [mockTransaction];
       mockTransactionRepo.findByIds.mockResolvedValue(transactions);
-      mockTransactionRepo.findOne.mockRejectedValue(new Error('Database error'));
 
-      const result = await service.getBatchStatus(['txn_123']);
+      const result = await service.getBatchStatus(['txn_123', 'missing-id']);
 
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('txn_123');
+      expect(mockTransactionRepo.findOne).not.toHaveBeenCalled();
     });
 
     it('should apply query parameters to all transactions in batch', async () => {
