@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test contract boundary and property cases
+        run: pnpm exec hardhat test test/bridge/NonceBitmap.test.ts test/utils/CalldataSlicer.test.ts
+
       - name: Lint
         run: pnpm run lint
         working-directory: apps/api
@@ -50,4 +53,3 @@ jobs:
 
       - name: Test Cargo Rules
         run: cargo test
-
