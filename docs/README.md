@@ -65,11 +65,14 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
   - UI status updates
   - Configuration options
 
-- **[ROUTING_REGRESSION_CORPUS.md](./ROUTING_REGRESSION_CORPUS.md)** - ROUTING REGRESSION CORPUS
-  - JSON corpus format and validation limits
-  - Known-issue (xfail) cases
-  - Runner logging and metrics
-  - Troubleshooting failing cases
+- **[PRE_SIGNING_READINESS.md](./PRE_SIGNING_READINESS.md)** - PRE-SIGNING SAFETY
+  - Required balance and allowance checks
+  - Route, policy limit, provider health, and quote freshness gates
+  - Fail-closed signer wrapper and safe failure handling
+- **[ROUTE_REJECTION_REASONS.md](./ROUTE_REJECTION_REASONS.md)** - ROUTE DECISIONS
+  - Stable codes for rejected route candidates
+  - All applicable rejection reasons and backward-compatible summaries
+  - Policy boundary and invalid candidate data behavior
 
 - **[SIGNATURE_SPECIFICATION.md](./SIGNATURE_SPECIFICATION.md)** - SIGNATURE SPEC
   - EIP-712 typed data hashing for cross-chain messages
@@ -89,6 +92,11 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
   - Timeout limits for slow/unresponsive APIs
   - Retry behavior on timeout failures
   - Simulation/testing guidance
+
+- **[SERVICE_OBJECTIVES_AND_INCIDENT_RESPONSE.md](./SERVICE_OBJECTIVES_AND_INCIDENT_RESPONSE.md)** - OPERATIONS
+  - API availability and quote latency objectives
+  - Critical incident alert thresholds and response steps
+  - Telemetry and production security guidance
 
 ---
 

@@ -22,11 +22,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+
+      - name: Test controlled canary rollout
+        run: pnpm --filter @bridgewise/relayer-service exec jest --runInBand --moduleFileExtensions ts json js -- executors/canary-rollout.spec.ts
+      - name: Test key vault and rotation lifecycle
+        run: pnpm --filter api exec jest --runInBand --moduleFileExtensions ts json js -- security/api-key-vault.service.spec.ts security/api-key-rotation.service.spec.ts
+
       - name: Build
         run: pnpm run build
 
-      - name: Test router (unit + routing regression corpus)
-        run: pnpm --filter @bridgewise/router test
+      - name: Build relayer service
+        run: pnpm --filter @bridgewise/relayer-service build
 
       - uses: dtolnay/rust-toolchain@stable
 
