@@ -25,6 +25,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Test router (unit + routing regression corpus)
+        run: pnpm --filter @bridgewise/router test
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Test Cargo Rules

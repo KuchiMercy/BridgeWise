@@ -65,6 +65,12 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
   - UI status updates
   - Configuration options
 
+- **[ROUTING_REGRESSION_CORPUS.md](./ROUTING_REGRESSION_CORPUS.md)** - ROUTING REGRESSION CORPUS
+  - JSON corpus format and validation limits
+  - Known-issue (xfail) cases
+  - Runner logging and metrics
+  - Troubleshooting failing cases
+
 - **[SIGNATURE_SPECIFICATION.md](./SIGNATURE_SPECIFICATION.md)** - SIGNATURE SPEC
   - EIP-712 typed data hashing for cross-chain messages
   - Mandatory domain separator parameters (`sourceChainId`, `targetChainId`, `bridgeAddress`)
