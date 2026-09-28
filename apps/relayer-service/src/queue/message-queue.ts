@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import {
   CrossChainMessage,
+  InflightMessageSnapshot,
   MessageStatus,
   MessageQueueItem,
   QueueConfig,
@@ -80,6 +81,7 @@ export class MessageQueue extends EventEmitter {
 
     this.queue.delete(oldest.message.id);
     this.processing.set(oldest.message.id, oldest);
+    oldest.inflightAt = Date.now();
     oldest.message.status = 'processing';
 
     this.emit('message-dequeued', { messageId: oldest.message.id });
@@ -88,36 +90,48 @@ export class MessageQueue extends EventEmitter {
 
   async complete(result: ExecutionResult): Promise<void> {
     const item = this.processing.get(result.messageId) ?? null;
+    if (!item) {
+      // Completion for a message the queue no longer tracks, for example a late
+      // reconciled result racing the executor's own completion. Record it once
+      // so the real outcome is never overwritten.
+      if (!this.completed.has(result.messageId)) {
+        this.completed.set(result.messageId, result);
+      }
+      return;
+    }
+
     this.processing.delete(result.messageId);
+    if (result.success) {
+      item.message.status = 'confirmed';
+    }
     this.completed.set(result.messageId, result);
 
     if (result.success) {
       this.emit('message-completed', result);
+      return;
+    }
+
+    item.attempts++;
+    if (item.attempts <= this.config.maxRetries) {
+      item.nextRetryAt = Date.now() + this.config.retryDelayMs * Math.pow(2, item.attempts - 1);
+      item.message.status = 'queued';
+      item.message.lastError = result.error;
+      this.queue.set(result.messageId, item);
+      this.emit('message-retrying', {
+        messageId: result.messageId,
+        attempt: item.attempts,
+        maxRetries: this.config.maxRetries,
+        nextRetryAt: item.nextRetryAt,
+        error: result.error,
+      });
     } else {
-      if (item) {
-        item.attempts++;
-        if (item.attempts <= this.config.maxRetries) {
-          item.nextRetryAt = Date.now() + this.config.retryDelayMs * Math.pow(2, item.attempts - 1);
-          item.message.status = 'queued';
-          item.message.lastError = result.error;
-          this.queue.set(result.messageId, item);
-          this.emit('message-retrying', {
-            messageId: result.messageId,
-            attempt: item.attempts,
-            maxRetries: this.config.maxRetries,
-            nextRetryAt: item.nextRetryAt,
-            error: result.error,
-          });
-        } else {
-          item.message.status = 'failed';
-          this.failed.set(result.messageId, item);
-          this.emit('message-failed', {
-            messageId: result.messageId,
-            attempts: item.attempts,
-            lastError: result.error,
-          });
-        }
-      }
+      item.message.status = 'failed';
+      this.failed.set(result.messageId, item);
+      this.emit('message-failed', {
+        messageId: result.messageId,
+        attempts: item.attempts,
+        lastError: result.error,
+      });
     }
   }
 
@@ -127,6 +141,83 @@ export class MessageQueue extends EventEmitter {
 
   getProcessingCount(): number {
     return this.processing.size;
+  }
+
+  /** Number of in-flight messages whose transaction has been broadcast. */
+  getSubmittedCount(): number {
+    let count = 0;
+    for (const item of this.processing.values()) {
+      if (item.message.status === 'submitted') count++;
+    }
+    return count;
+  }
+
+  /**
+   * Records that a dequeued message was broadcast to its destination chain.
+   * The message stays in flight under the `submitted` status until it is
+   * completed, forced to `failed`, or reconciled. Returns `false` when the
+   * message is not actually in flight.
+   */
+  markSubmitted(messageId: string, txHash: string): boolean {
+    const item = this.processing.get(messageId);
+    if (!item) return false;
+    item.submittedTxHash = txHash;
+    item.submittedAt = Date.now();
+    item.message.status = 'submitted';
+    this.emit('message-submitted', {
+      messageId,
+      txHash,
+      destinationChainId: item.message.destinationChainId,
+    });
+    return true;
+  }
+
+  /** The tracked status of a message, or `null` when the queue does not know it. */
+  getMessageStatus(messageId: string): MessageStatus | null {
+    const pending = this.queue.get(messageId);
+    if (pending) return pending.message.status;
+    const inflight = this.processing.get(messageId);
+    if (inflight) return inflight.message.status;
+    if (this.failed.has(messageId)) return 'failed';
+    if (this.completed.has(messageId)) return 'confirmed';
+    return null;
+  }
+
+  /** Read-only view of every message currently being delivered, for monitoring and reconciliation. */
+  getInflightSnapshot(): InflightMessageSnapshot[] {
+    return Array.from(this.processing.values()).map((item) => ({
+      messageId: item.message.id,
+      status: item.message.status,
+      attempts: item.attempts,
+      queuedAt: item.queuedAt,
+      inflightAt: item.inflightAt,
+      submittedAt: item.submittedAt,
+      submittedTxHash: item.submittedTxHash,
+      destinationChainId: item.message.destinationChainId,
+      message: { ...item.message },
+    }));
+  }
+
+  /**
+   * Marks an in-flight message failed immediately, with no further delivery
+   * attempt. Used when the destination chain proves the attempt cannot
+   * succeed, such as a reverted transaction. Returns `false` when the message
+   * is not in flight.
+   */
+  fail(messageId: string, error?: string): boolean {
+    const item = this.processing.get(messageId);
+    if (!item) return false;
+    this.processing.delete(messageId);
+    item.message.status = 'failed';
+    item.message.lastError = error;
+    this.failed.set(messageId, item);
+    this.emit('message-failed', {
+      messageId,
+      attempts: item.attempts,
+      lastError: error,
+      reason: 'forced',
+    });
+    return true;
   }
 
   getCompletedCount(): number {

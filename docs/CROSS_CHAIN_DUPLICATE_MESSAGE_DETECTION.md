@@ -2,6 +2,8 @@
 
 The relayer (`apps/relayer-service`) rejects cross-chain messages it has already accepted, so a re-delivered message cannot be executed twice on the destination chain. This is the relayer's first line of defence. It does not replace on-chain replay protection (see [Dependencies](#dependencies)).
 
+Once a message is accepted it is tracked through delivery. If the queue's local view of a message's state ever diverges from the destination chain - a hung executor, a lost completion callback, a receipt that never finalised - see [Message status reconciliation](MESSAGE_STATUS_RECONCILIATION.md), which repairs that divergence.
+
 ## What counts as a duplicate
 
 `MessageQueue.enqueue()` checks every message before queueing it and returns `false` when it is rejected.

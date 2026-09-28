@@ -49,6 +49,9 @@ jobs:
       - name: Build relayer service
         run: pnpm --filter @bridgewise/relayer-service build
 
+      - name: Test relayer service
+        run: pnpm --filter @bridgewise/relayer-service test
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Test Cargo Rules
