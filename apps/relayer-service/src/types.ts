@@ -1,5 +1,20 @@
 export type ChainType = 'evm' | 'soroban' | 'solana';
 
+export interface MessageValidationOptions {
+  /** Validate addresses against the format of the chain named on the message. */
+  enforceAddressFormat: boolean;
+  /** Upper bound on `id` length in characters. */
+  maxIdLength: number;
+  /** Upper bound on `payload` length in characters. */
+  maxPayloadLength: number;
+}
+
+export interface MessageValidationStats {
+  checked: number;
+  accepted: number;
+  rejected: number;
+}
+
 export interface CrossChainMessage {
   id: string;
   sourceChainId: string;
@@ -70,6 +85,12 @@ export interface QueueConfig {
   pollIntervalMs: number;
   /** Duplicate message detection settings. Enabled by default; pass `false` to disable. */
   deduplication?: Partial<DuplicateDetectorConfig> | false;
+  /**
+   * Structural validation applied to every message on the way in. Enabled by
+   * default; pass `false` to accept messages unvalidated, which is only safe
+   * when every producer is already trusted and schema-checked.
+   */
+  validation?: Partial<MessageValidationOptions> | false;
 }
 
 export interface DuplicateDetectorConfig {

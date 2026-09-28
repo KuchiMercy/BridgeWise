@@ -2,6 +2,8 @@
 
 The relayer (`apps/relayer-service`) rejects cross-chain messages it has already accepted, so a re-delivered message cannot be executed twice on the destination chain. This is the relayer's first line of defence. It does not replace on-chain replay protection (see [Dependencies](#dependencies)).
 
+Structural validation runs before detection: a malformed message is rejected outright and never reaches the detector. See [Cross-chain message validation](CROSS_CHAIN_MESSAGE_VALIDATION.md).
+
 ## What counts as a duplicate
 
 `MessageQueue.enqueue()` checks every message before queueing it and returns `false` when it is rejected.
