@@ -11,8 +11,7 @@
     "baseUrl": ".",
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": ".",
-    "ignoreDeprecations": "6.0"
+    "rootDir": "."
   },
   "include": [
     "api/src/**/*.ts",

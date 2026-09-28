@@ -13,9 +13,8 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": "./",
-    "ignoreDeprecations": "6.0",
+    "types": ["node", "jest"],
     "paths": {
       "@bridgewise/bridge-core": ["../../packages/utils/src"],
       "@bridgewise/bridge-core/*": ["../../packages/utils/src/*"],

@@ -39,6 +39,13 @@ export class TransactionsStatusService {
       throw new NotFoundException(`Transaction ${id} not found`);
     }
 
+    return this.buildStatusResponse(transaction, query);
+  }
+
+  private buildStatusResponse(
+    transaction: Transaction,
+    query: TransactionStatusQuery,
+  ): TransactionStatusResponse {
     const stableState = this.mapToStableState(transaction);
     const sourceChain = this.buildChainReference(
       transaction,
@@ -238,12 +245,19 @@ export class TransactionsStatusService {
     query: TransactionStatusQuery = {},
   ): Promise<TransactionStatusResponse[]> {
     const transactions = await this.transactionRepo.findByIds(ids);
+    const transactionsById = new Map(
+      transactions.map((transaction) => [transaction.id, transaction]),
+    );
     const results: TransactionStatusResponse[] = [];
 
-    for (const transaction of transactions) {
+    for (const id of ids) {
+      const transaction = transactionsById.get(id);
+      if (!transaction) {
+        continue;
+      }
+
       try {
-        const status = await this.getStatus(transaction.id, query);
-        results.push(status);
+        results.push(this.buildStatusResponse(transaction, query));
       } catch (error) {
         this.logger.error(`Failed to get status for transaction ${transaction.id}: ${error.message}`);
         // Skip failed transactions in batch
