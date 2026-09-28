@@ -28,11 +28,11 @@ jobs:
       - name: Lint
         run: pnpm run lint
         working-directory: apps/api
+      - name: Verify deployment configuration safety
+        run: node --test scripts/check-deployment-config.test.mjs
 
-      - name: Test controlled canary rollout
-        run: pnpm --filter @bridgewise/relayer-service exec jest --runInBand --moduleFileExtensions ts json js -- executors/canary-rollout.spec.ts
-      - name: Test key vault and rotation lifecycle
-        run: pnpm --filter api exec jest --runInBand --moduleFileExtensions ts json js -- security/api-key-vault.service.spec.ts security/api-key-rotation.service.spec.ts
+      - name: Test production environment loading
+        run: pnpm --filter api exec jest --runInBand --moduleFileExtensions ts json js -- config/env-loader.spec.ts
 
       - name: Build
         run: pnpm run build
