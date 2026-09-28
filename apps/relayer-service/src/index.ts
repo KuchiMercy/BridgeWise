@@ -7,6 +7,23 @@ export {
   computeMessageFingerprint,
   DEFAULT_DUPLICATE_DETECTOR_CONFIG,
 } from './dedup/duplicate-message-detector';
+export {
+  validateCrossChainMessage,
+  isValidCrossChainMessage,
+  assertValidCrossChainMessage,
+  isValidAddressForChainType,
+  resolveChainType,
+  DEFAULT_MESSAGE_VALIDATION_OPTIONS,
+  MESSAGE_STATUSES,
+  EVM_ADDRESS_PATTERN,
+  STELLAR_ADDRESS_PATTERN,
+  SOLANA_ADDRESS_PATTERN,
+} from './validation/message-validator';
+export type {
+  MessageValidationError,
+  MessageValidationErrorCode,
+  MessageValidationResult,
+} from './validation/message-validator';
 export type {
   CanaryExecutionResult,
   CanaryOutcomeMetric,
@@ -32,4 +49,6 @@ export type {
   DuplicateReason,
   DuplicateCheckResult,
   DuplicateDetectorStats,
+  MessageValidationOptions,
+  MessageValidationStats,
 } from './types';
