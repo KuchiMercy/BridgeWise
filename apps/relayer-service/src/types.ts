@@ -50,6 +50,60 @@ export interface ChainNonce {
   nonce: number;
 }
 
+/**
+ * Durable storage for the relayer's per-chain message nonces.
+ *
+ * The executors hand out a fresh nonce for every message they deliver to a
+ * destination chain. Keeping that counter only in memory means a restart
+ * resets it to zero and a redelivered message can receive a different nonce,
+ * which lets the same message be executed twice on the destination chain. A
+ * `NonceStore` makes both the high-water counter and the nonce pinned to each
+ * message survive across restarts and instances.
+ *
+ * Implementations must satisfy two guarantees:
+ *
+ * - `setNonce`/`setMessageNonce` are durable before the returned value is
+ *   used, so a crash can never re-issue an already-assigned nonce;
+ * - writes are serialised, so concurrent callers never observe a gap-free
+ *   counter as anything but strictly increasing.
+ *
+ * The package ships `InMemoryNonceStore` (the default, matching today's
+ * behaviour) and `FileNonceStore` (a single-instance file-backed store with
+ * atomic writes). Multi-replica deployments must supply a transactional
+ * shared store (for example Redis-backed) implementing the same interface.
+ */
+export interface NonceStore {
+  /** The persisted next nonce to use for `chainId`, or `null` when unknown. */
+  getNonce(chainId: string): Promise<number | null>;
+  /** Persists `nonce` as the next nonce to use for `chainId`. */
+  setNonce(chainId: string, nonce: number): Promise<void>;
+  /**
+   * The nonce already pinned to `messageId`, or `null`. Used so a redelivered
+   * message reuses the nonce it was first delivered with.
+   */
+  getMessageNonce(messageId: string): Promise<ChainNonce | null>;
+  /** Pins `nonce` to `messageId`, durably, before the nonce is used. */
+  setMessageNonce(messageId: string, chainId: string, nonce: number): Promise<void>;
+  /** Drops the pin for `messageId` once its delivery is confirmed and complete. */
+  removeMessageNonce(messageId: string): Promise<void>;
+}
+
+export interface FileNonceStoreOptions {
+  /** Path of the JSON file holding the nonce state. The parent directory is created if missing. */
+  filePath: string;
+  /**
+   * Flush the written payload to disk before atomically renaming it into
+   * place. Defaults to `true` so a completed `setNonce` survives a crash.
+   */
+  fsync?: boolean;
+  /**
+   * Upper bound on remembered message-nonce pins. Oldest pins are evicted
+   * first; the evicted count is exposed through `getStats()`. Defaults to
+   * 100_000.
+   */
+  maxMessageNonces?: number;
+}
+
 export interface ExecutionResult {
   messageId: string;
   success: boolean;
@@ -76,6 +130,14 @@ export interface ExecutorConfig {
   gasRepricing: GasRepriceConfig;
   confirmationBlocks: number;
   confirmationPollIntervalMs: number;
+  /**
+   * Durable store backing the per-chain nonce counter and per-message nonce
+   * pins. Defaults to a process-local `InMemoryNonceStore`, which matches the
+   * pre-feature behaviour; pass a `FileNonceStore` (or a shared transactional
+   * store in multi-replica deployments) so a restart or failover never resets
+   * the counter or re-issues a message's nonce.
+   */
+  nonceStore?: NonceStore;
 }
 
 export interface QueueConfig {
