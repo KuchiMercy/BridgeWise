@@ -17,7 +17,7 @@ const post = axios.post as jest.Mock;
 function makeMessage(overrides: Partial<CrossChainMessage> = {}): CrossChainMessage {
   return {
     id: 'msg-1',
-    sourceChainId: 'ethereum',
+    sourceChainId: 'arbitrum',
     destinationChainId: 'ethereum',
     sourceTxHash: '0x' + 'a'.repeat(64),
     sourceBlockNumber: 10_000_000,
