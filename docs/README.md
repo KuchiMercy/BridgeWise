@@ -6,6 +6,10 @@ Welcome to the BridgeWise API documentation! This comprehensive guide covers eve
 
 ### Smart Contract Operations
 
+- **[CONTRACT_FUZZ_TESTING.md](./CONTRACT_FUZZ_TESTING.md)**
+  - Deterministic property and boundary tests for contract utilities
+  - Reproduction guidance and fuzzing limitations
+
 - **[CONTRACT_UPGRADES_AND_ACCOUNTING.md](./CONTRACT_UPGRADES_AND_ACCOUNTING.md)**
   - Upgrade authorization and immutable-code policy
   - Fee and vault accounting invariants
