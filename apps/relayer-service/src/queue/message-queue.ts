@@ -4,12 +4,15 @@ import {
   InflightMessageSnapshot,
   MessageStatus,
   MessageQueueItem,
+  MessageValidationOptions,
+  MessageValidationStats,
   QueueConfig,
   ExecutionResult,
   DuplicateCheckResult,
   DuplicateDetectorStats,
 } from '../types';
 import { DuplicateMessageDetector, computeMessageFingerprint } from '../dedup/duplicate-message-detector';
+import { validateCrossChainMessage, DEFAULT_MESSAGE_VALIDATION_OPTIONS } from '../validation/message-validator';
 
 const DEFAULT_CONFIG: QueueConfig = {
   maxRetries: 5,
@@ -26,16 +29,31 @@ export class MessageQueue extends EventEmitter {
   private completed: Map<string, ExecutionResult> = new Map();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private detector: DuplicateMessageDetector | null;
+  private validation: MessageValidationOptions | false;
+  private validationStats: MessageValidationStats = { checked: 0, accepted: 0, rejected: 0 };
 
   constructor(config?: Partial<QueueConfig>) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.detector =
       this.config.deduplication === false ? null : new DuplicateMessageDetector(this.config.deduplication);
+    this.validation =
+      this.config.validation === false
+        ? false
+        : { ...DEFAULT_MESSAGE_VALIDATION_OPTIONS, ...this.config.validation };
   }
 
-  /** Returns false when the message was rejected as a duplicate. */
+  /**
+   * Accepts a message for delivery.
+   *
+   * Returns `false` when the message was rejected, either as malformed or as
+   * a duplicate. Malformed messages are rejected before duplicate detection
+   * so a bad message cannot occupy a slot in the detector's window and evict a
+   * legitimate one.
+   */
   enqueue(message: CrossChainMessage): boolean {
+    if (!this.validate(message)) return false;
+
     const check = this.checkDuplicate(message);
     if (check.duplicate) {
       const event = {
@@ -269,13 +287,46 @@ export class MessageQueue extends EventEmitter {
     return this.detector ? this.detector.getStats() : null;
   }
 
+  /** Intake counters. A rising `rejected` count points at a broken producer. */
+  getValidationStats(): MessageValidationStats {
+    return { ...this.validationStats };
+  }
+
   clear(): void {
     this.queue.clear();
     this.processing.clear();
     this.failed.clear();
     this.completed.clear();
     this.detector?.clear();
+    this.validationStats = { checked: 0, accepted: 0, rejected: 0 };
     this.emit('queue-cleared');
+  }
+
+  /**
+   * Rejects structurally malformed messages before they reach the queue or the
+   * duplicate detector. `messageId` is reported as a string even when the
+   * field is missing or of the wrong type, so the event stays loggable.
+   *
+   * Counters describe validation outcomes only; duplicate rejections are
+   * reported by `getDuplicateStats`.
+   */
+  private validate(message: CrossChainMessage): boolean {
+    if (this.validation === false) return true;
+
+    this.validationStats.checked++;
+    const result = validateCrossChainMessage(message, this.validation);
+    if (result.valid) {
+      this.validationStats.accepted++;
+      return true;
+    }
+
+    this.validationStats.rejected++;
+    this.emit('message-rejected', {
+      messageId: typeof message?.id === 'string' ? message.id : undefined,
+      reason: 'malformed',
+      errors: result.errors,
+    });
+    return false;
   }
 
   /**
